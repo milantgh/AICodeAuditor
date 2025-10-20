@@ -1,0 +1,192 @@
+[
+  {
+    "lang": "python",
+    "pattern": "subprocess\\.call\\(.*shell=True.*input.*",
+    "description": "使用shell=True且包含用户输入，存在命令注入风险"
+  },
+  {
+    "lang": "python",
+    "pattern": "flask\\.render_template_string\\(.*\\{\\{.*request.*\\}\\}.*",
+    "description": "Flask模板中直接使用请求参数，存在SSTI漏洞"
+  },
+  {
+    "lang": "python",
+    "pattern": "django\\.forms\\.Form\\s+.*clean_.*\\s*=\\s*.*eval\\(",
+    "description": "Django表单验证中使用eval，存在代码注入风险"
+  },
+  {
+    "lang": "javascript",
+    "pattern": "window\\.location\\s*=\\s*.*userInput.*",
+    "description": "使用用户输入修改location，可能导致开放重定向"
+  },
+  {
+    "lang": "javascript",
+    "pattern": "\\$\\(.*\\)\\.html\\(.*userInput.*\\)",
+    "description": "jQuery html()方法插入用户输入，存在XSS风险"
+  },
+  {
+    "lang": "javascript",
+    "pattern": "require\\(.*userInput.*\\)",
+    "description": "Node.js中使用用户输入动态加载模块，存在模块注入风险"
+  },
+  {
+    "lang": "java",
+    "pattern": "Statement\\s+stmt\\s*=\\s*conn\\.createStatement\\(\\);\\s*stmt\\.executeQuery\\(.*request\\.getParameter.*",
+    "description": "使用Statement执行包含请求参数的SQL，存在注入风险"
+  },
+  {
+    "lang": "java",
+    "pattern": "new\\s+FileOutputStream\\(.*request\\.getParameter.*",
+    "description": "使用请求参数直接创建文件输出流，存在路径遍历风险"
+  },
+  {
+    "lang": "java",
+    "pattern": "Runtime\\.getRuntime\\(\\)\\.exec\\(.*request\\.getParameter.*",
+    "description": "执行包含请求参数的系统命令，存在命令注入风险"
+  },
+  {
+    "lang": "php",
+    "pattern": "mysql_query\\(.*\\$_POST\\[.*\\]",
+    "description": "使用POST参数直接拼接SQL查询，存在注入风险"
+  },
+  {
+    "lang": "php",
+    "pattern": "include\\(\\$_GET\\[.*\\]\\)",
+    "description": "使用GET参数动态包含文件，存在文件包含漏洞"
+  },
+  {
+    "lang": "php",
+    "pattern": "unserialize\\(.*\\$_COOKIE\\[.*\\]",
+    "description": "反序列化Cookie中的数据，存在反序列化漏洞"
+  },
+  {
+    "lang": "c",
+    "pattern": "printf\\(user_input.*\\);",
+    "description": "使用用户输入作为printf格式字符串，存在格式化字符串漏洞"
+  },
+  {
+    "lang": "c",
+    "pattern": "strcpy\\(.*,.*user_input.*\\);",
+    "description": "使用strcpy处理用户输入，存在缓冲区溢出风险"
+  },
+  {
+    "lang": "c",
+    "pattern": "system\\(.*user_input.*\\);",
+    "description": "执行包含用户输入的系统命令，存在命令注入风险"
+  },
+  {
+    "lang": "c++",
+    "pattern": "cin\\s*>>\\s*buffer;",
+    "description": "使用cin直接读取输入到缓冲区，存在溢出风险"
+  },
+  {
+    "lang": "c++",
+    "pattern": "std::string\\s+cmd\\s*=\\s*\"ls \"\\s+\\+\\s+user_input;\\s*system\\(cmd\\.c_str\\(\\)\\);",
+    "description": "拼接用户输入到命令字符串并执行，存在注入风险"
+  },
+  {
+    "lang": "c++",
+    "pattern": "fopen\\(user_input.*,.*\"r\"\\)",
+    "description": "使用用户输入作为文件路径，存在路径遍历风险"
+  },
+  {
+    "lang": "csharp",
+    "pattern": "SqlCommand\\s+cmd\\s*=\\s*new\\s+SqlCommand\\(\"SELECT.*\"\\s+\\+\\s+Request\\.QueryString.*,.*\\);",
+    "description": "拼接查询字符串到SQL命令，存在注入风险"
+  },
+  {
+    "lang": "csharp",
+    "pattern": "File\\.ReadAllText\\(Server\\.MapPath\\(Request\\.Form.*\\)\\)",
+    "description": "使用表单参数作为文件路径，存在路径遍历风险"
+  },
+  {
+    "lang": "go",
+    "pattern": "exec\\.Command\\(\"bash\", \"-c\", .*r\\.FormValue.*\\)",
+    "description": "使用用户输入构造bash命令，存在命令注入风险"
+  },
+  {
+    "lang": "go",
+    "pattern": "database/sql\\.Query\\(db, .*r\\.URL\\.Query.*\\)",
+    "description": "拼接URL参数到SQL查询，存在注入风险"
+  },
+  {
+    "lang": "ruby",
+    "pattern": "ActiveRecord::Base\\.find_by_sql\\(\"SELECT.*#{params.*}\"\\)",
+    "description": "使用参数插值构造SQL，存在注入风险"
+  },
+  {
+    "lang": "ruby",
+    "pattern": "render\\(:text => params.*\\)",
+    "description": "直接渲染参数到页面，存在XSS风险"
+  },
+  {
+    "lang": "rust",
+    "pattern": "std::process::Command::new\\(\"sh\"\\)\\.arg\\(\"-c\"\\)\\.arg\\(.*user_input.*\\)\\.spawn\\(\\)",
+    "description": "使用用户输入构造shell命令，存在注入风险"
+  },
+  {
+    "lang": "rust",
+    "pattern": "std::fs::read_to_string\\(user_input.*\\)",
+    "description": "使用用户输入作为文件路径，存在路径遍历风险"
+  },
+  {
+    "lang": "swift",
+    "pattern": "Process\\(command: \"/bin/sh\"\\)\\.arguments = \\[\"-c\", .*userInput.*\\]",
+    "description": "使用用户输入构造shell命令，存在注入风险"
+  },
+  {
+    "lang": "swift",
+    "pattern": "try! String\\(contentsOf: URL\\(string: userInput.*\\)!\\)",
+    "description": "使用用户输入作为URL，存在SSRF风险"
+  },
+  {
+    "lang": "kotlin",
+    "pattern": "Runtime.getRuntime\\(\\).exec\\(\"bash -c $userInput\"\\)",
+    "description": "使用用户输入构造shell命令，存在注入风险"
+  },
+  {
+    "lang": "kotlin",
+    "pattern": "File\\(userInput\\).readText\\(\\)",
+    "description": "使用用户输入作为文件路径，存在路径遍历风险"
+  },
+  {
+    "lang": "php",
+    "pattern": "DB::raw\\(\"SELECT.*\".*Input::get.*\\)",
+    "description": "Laravel中使用原始SQL拼接输入，存在注入风险"
+  },
+  {
+    "lang": "php",
+    "pattern": "echo\\s+\\$this->request->data\\[.*\\];",
+    "description": "CodeIgniter中直接输出请求数据，存在XSS风险"
+  },
+  {
+    "lang": "javascript",
+    "pattern": "dangerouslySetInnerHTML=\\{\\{ __html: props\\.userInput \\}\\}",
+    "description": "React中使用dangerouslySetInnerHTML插入用户输入，存在XSS风险"
+  },
+  {
+    "lang": "html",
+    "pattern": "<div\\s*v-html=.*userInput.*></div>",
+    "description": "Vue中使用v-html指令插入用户输入，存在XSS风险"
+  },
+  {
+    "lang": "shell",
+    "pattern": "eval\\s+\\$1",
+    "description": "Shell脚本中使用eval处理参数，存在代码注入风险"
+  },
+  {
+    "lang": "perl",
+    "pattern": "system\\(\"ls \".\\$ARGV\\[0\\]\\);",
+    "description": "Perl中拼接参数执行系统命令，存在注入风险"
+  },
+  {
+    "lang": "java",
+    "pattern": "WebView\\.loadUrl\\(\"javascript: \"\\+userInput\\)",
+    "description": "Android WebView中执行包含用户输入的JS，存在XSS风险"
+  },
+  {
+    "lang": "swift",
+    "pattern": "WKWebView\\.evaluateJavaScript\\(userInput.*, completionHandler: nil\\)",
+    "description": "iOS中执行包含用户输入的JS，存在XSS风险"
+  }
+]
