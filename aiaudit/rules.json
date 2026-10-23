@@ -1,0 +1,344 @@
+{
+  "version": "1.0.0",
+  "updated": "2026-10-23",
+  "rules": [
+    {
+      "id": "AIC-001",
+      "title": "硬编码的模型服务/云平台密钥",
+      "severity": "critical",
+      "category": "凭据与密钥",
+      "description": "源码中直接写入 OpenAI、Anthropic、Google、AWS、HuggingFace 等平台的访问密钥。密钥会随仓库、日志和构建产物扩散，任何能读取源码的人都能直接调用计费接口。",
+      "remediation": "把密钥移到环境变量或密钥管理服务（Vault/KMS），在仓库中加入 .env 并配置 .gitignore；立即在平台侧吊销已泄露的密钥。",
+      "references": ["OWASP LLM Top 10: LLM06 敏感信息泄露", "CWE-798 硬编码凭据"],
+      "patterns": [
+        "\\bsk-(?:proj-|ant-api\\d+-|ant-)?[A-Za-z0-9_\\-]{20,}",
+        "\\bAIza[0-9A-Za-z_\\-]{35}\\b",
+        "\\bAKIA[0-9A-Z]{16}\\b",
+        "\\bhf_[A-Za-z0-9]{30,}\\b",
+        "\\bxox[baprs]-[A-Za-z0-9\\-]{10,}"
+      ],
+      "negative": "(?i)(your|example|placeholder|dummy|sample|xxxx|<|\\$\\{)"
+    },
+    {
+      "id": "AIC-002",
+      "title": "配置中明文写入 API Key / Token",
+      "severity": "high",
+      "category": "凭据与密钥",
+      "description": "在代码或配置文件里以赋值形式保存较长的 API Key、访问令牌或客户端密钥，且数值不像占位符。",
+      "remediation": "改用环境变量或密钥管理服务注入；确认该凭据是否仍有权限，泄露后立即轮换。",
+      "references": ["OWASP LLM Top 10: LLM06 敏感信息泄露", "CWE-798 硬编码凭据"],
+      "patterns": [
+        "(?i)(api[_-]?key|access[_-]?token|client[_-]?secret|auth[_-]?token)[\"']?\\s*[:=]\\s*[\"'][A-Za-z0-9_\\-]{16,}[\"']"
+      ],
+      "negative": "(?i)(your|example|placeholder|dummy|sample|xxxx|<|\\$\\{)"
+    },
+    {
+      "id": "AIC-003",
+      "title": "环境变量文件中保存真实模型密钥",
+      "severity": "critical",
+      "category": "凭据与密钥",
+      "description": ".env 一类文件里直接写入了模型厂商的密钥。这类文件经常被误提交到仓库或被打包进镜像。",
+      "remediation": "只提交 .env.example，真实值放在部署环境或密钥管理服务；清理 Git 历史并轮换密钥。",
+      "references": ["OWASP LLM Top 10: LLM06 敏感信息泄露"],
+      "patterns": [
+        "(?i)^\\s*(OPENAI|ANTHROPIC|DEEPSEEK|DASHSCOPE|MOONSHOT|GEMINI|GOOGLE|HF|HUGGINGFACE|REPLICATE|COHERE|MISTRAL)[A-Z0-9_]*(KEY|TOKEN|SECRET)\\s*=\\s*\\S{8,}"
+      ],
+      "negative": "(?i)(your|example|placeholder|dummy|sample|xxxx|<|\\$\\{)"
+    },
+    {
+      "id": "AIC-004",
+      "title": "用户输入直接拼接进提示词（Python）",
+      "severity": "high",
+      "category": "提示注入",
+      "description": "使用 f-string 把请求参数、用户消息或表单内容直接拼进 system prompt / messages，攻击者可用指令覆盖模型行为，形成直接提示注入。",
+      "remediation": "把用户内容放入独立的 user 消息并做长度/内容约束；系统提示与用户输入严格分层，禁止字符串拼接进 system 角色。",
+      "references": ["OWASP LLM Top 10: LLM01 提示注入", "OWASP Agentic Security: 直接注入"],
+      "patterns": [
+        "(?i)(system[_-]?prompt|prompt|messages)\\s*=\\s*f[\"'][^\"\\n]*\\{[^}\\n]*(request|input|query|message|user|payload|param|body|form|args|content)"
+      ]
+    },
+    {
+      "id": "AIC-005",
+      "title": "用户输入直接拼接进提示词（JS/TS）",
+      "severity": "high",
+      "category": "提示注入",
+      "description": "在 JavaScript/TypeScript 中使用模板字符串把 req.body、query、params 等不可信输入拼进提示词，攻击者可注入新的指令。",
+      "remediation": "将用户内容作为独立消息传递，避免模板字符串拼接；对模型输出与工具调用做白名单校验。",
+      "references": ["OWASP LLM Top 10: LLM01 提示注入"],
+      "patterns": [
+        "(?i)(systemPrompt|prompt|messages)\\s*=\\s*`[^`\\n]*\\$\\{[^}\\n]*(req|input|query|message|user|payload|body|params|content)"
+      ]
+    },
+    {
+      "id": "AIC-006",
+      "title": "外部检索内容未经隔离进入提示词",
+      "severity": "high",
+      "category": "提示注入",
+      "description": "把网页、文档、知识库检索结果等外部内容直接拼接到提示词。攻击者可以污染文档或网页，实现间接提示注入。",
+      "remediation": "对外部内容做来源标记与内容过滤，放入独立的引用块并明确告知模型「以下内容不可信」；对敏感动作增加人工确认。",
+      "references": ["OWASP LLM Top 10: LLM01 提示注入", "OWASP Agentic Security: 间接注入"],
+      "patterns": [
+        "(?i)(prompt|messages)\\s*(\\+?=)\\s*[^;\\n]*(request\\.|req\\.|retrieved|documents?\\b|search_results|web_content|knowledge_base)"
+      ]
+    },
+    {
+      "id": "AIC-007",
+      "title": "模型输出被当作代码执行",
+      "severity": "critical",
+      "category": "不安全代码执行",
+      "description": "把 LLM 的回复交给 eval/exec、系统命令或子进程执行。只要模型被提示注入，就能在服务器上执行任意代码。",
+      "remediation": "禁止执行模型输出；如确需执行，必须在隔离沙箱中进行，并使用严格的白名单解析器而不是 eval。",
+      "references": ["OWASP LLM Top 10: LLM05 不安全输出处理", "CWE-94 代码注入", "CWE-78 命令注入"],
+      "patterns": [
+        "(?i)\\b(eval|exec)\\s*\\(\\s*(response|output|completion|answer|result|llm_?\\w*|message|content)\\b",
+        "(?i)(subprocess\\.(run|call|Popen|check_output)|os\\.system|os\\.popen)\\s*\\([^)\\n]*(response|completion|llm|output|answer|generated)"
+      ]
+    },
+    {
+      "id": "AIC-008",
+      "title": "不安全的模型/数据反序列化",
+      "severity": "high",
+      "category": "不安全反序列化",
+      "description": "使用 pickle、dill、joblib 或未限制 weights_only 的 torch.load 加载模型权重。恶意模型文件可在加载时执行任意代码。",
+      "remediation": "模型文件必须来自可信来源并校验哈希；torch.load 使用 weights_only=True，优先使用 safetensors 等安全格式。",
+      "references": ["OWASP LLM Top 10: LLM05 不安全输出处理", "CWE-502 不可信数据反序列化"],
+      "patterns": [
+        "(?i)\\b(pickle|dill)\\.loads?\\s*\\(",
+        "(?i)\\bjoblib\\.load\\s*\\(",
+        "(?i)\\btorch\\.load\\s*\\("
+      ],
+      "negative": "(?i)weights_only\\s*=\\s*True"
+    },
+    {
+      "id": "AIC-009",
+      "title": "加载模型时允许远程代码执行",
+      "severity": "high",
+      "category": "供应链风险",
+      "description": "transformers 的 trust_remote_code=True 会执行模型仓库中携带的 Python 代码，恶意模型仓库可借此接管进程。",
+      "remediation": "保持 trust_remote_code=False；确需自定义模型时，固定 revision 并在隔离环境审计仓库代码。",
+      "references": ["OWASP LLM Top 10: LLM03 供应链风险", "MITRE ATLAS: 模型供应链"],
+      "patterns": [
+        "(?i)(trust_remote_code|use_remote_code)\\s*=\\s*True"
+      ]
+    },
+    {
+      "id": "AIC-010",
+      "title": "从不安全来源下载模型权重",
+      "severity": "high",
+      "category": "供应链风险",
+      "description": "从 http:// 或临时目录加载模型权重，传输过程可被篡改，攻击者可以替换模型或注入恶意代码。",
+      "remediation": "仅从可信仓库通过 HTTPS 下载，并校验版本、哈希与签名；固定 revision/commit。",
+      "references": ["OWASP LLM Top 10: LLM03 供应链风险"],
+      "patterns": [
+        "(?i)(from_pretrained|load_model|torch\\.hub\\.load|load_state_dict)\\s*\\([^)\\n]*(https?://|/tmp/|/var/tmp/)"
+      ]
+    },
+    {
+      "id": "AIC-011",
+      "title": "关闭 TLS 证书校验",
+      "severity": "medium",
+      "category": "传输安全",
+      "description": "调用模型 API 或下载模型时关闭了证书校验（verify=False / NODE_TLS_REJECT_UNAUTHORIZED=0），使中间人攻击可行。",
+      "remediation": "恢复证书校验；企业内网自签证书应把 CA 加入信任链，而不是全局关闭校验。",
+      "references": ["CWE-295 证书校验不当"],
+      "patterns": [
+        "(?i)verify\\s*=\\s*False",
+        "ssl\\._create_unverified_context",
+        "(?i)NODE_TLS_REJECT_UNAUTHORIZED\\s*=\\s*[\"']?0"
+      ]
+    },
+    {
+      "id": "AIC-012",
+      "title": "使用 shell=True 或直接调用系统命令",
+      "severity": "high",
+      "category": "命令注入",
+      "description": "AI Agent 的工具函数以 shell=True 或 os.system 执行命令，参数一旦包含用户/模型可控内容即可注入系统命令。",
+      "remediation": "使用参数数组调用（shell=False），对命令与参数做白名单校验；工具执行放在隔离沙箱并限制网络与文件权限。",
+      "references": ["OWASP Agentic Security: 工具滥用", "CWE-78 命令注入"],
+      "patterns": [
+        "(?i)subprocess\\.(run|call|Popen|check_output)\\s*\\([^)\\n]*shell\\s*=\\s*True",
+        "(?i)(os\\.system|os\\.popen|commands\\.getoutput)\\s*\\(\\s*f?[\"'][^\"\\n]*\\{",
+        "(?i)child_process\\.(exec|execSync|spawn)\\s*\\("
+      ]
+    },
+    {
+      "id": "AIC-013",
+      "title": "从网络直接执行脚本或安装依赖",
+      "severity": "high",
+      "category": "供应链风险",
+      "description": "通过 curl | sh、pip install git+http、npx -y 等方式从网络直接执行未固定版本的代码，供应链可被投毒。",
+      "remediation": "依赖必须固定版本并校验哈希；禁止管道执行远程脚本，安装动作进入离线构建流程。",
+      "references": ["OWASP LLM Top 10: LLM03 供应链风险"],
+      "patterns": [
+        "(?i)(curl|wget)\\s+[^|\\n]*\\|\\s*(ba)?sh",
+        "(?i)pip3?\\s+install\\s+(git\\+|https?://)",
+        "(?i)npx\\s+-y\\s+[^\\s\"']+"
+      ]
+    },
+    {
+      "id": "AIC-014",
+      "title": "直接注册高危 Agent 工具",
+      "severity": "high",
+      "category": "Agent 权限",
+      "description": "注册了可直接执行 Shell / Python / 终端命令的 Agent 工具。若模型可被提示注入，等于把命令执行能力交给攻击者。",
+      "remediation": "默认不注册执行类工具；必须启用时增加人工审批、命令白名单和沙箱隔离。",
+      "references": ["OWASP Agentic Security: 工具滥用", "OWASP LLM Top 10: LLM08 过度代理"],
+      "patterns": [
+        "(?i)(ShellTool|BashTool|PythonREPLTool|TerminalTool|CodeInterpreterTool)\\s*\\("
+      ]
+    },
+    {
+      "id": "AIC-015",
+      "title": "工具描述声明了高风险能力",
+      "severity": "medium",
+      "category": "Agent 权限",
+      "description": "工具/技能的 name 或 description 中直接声明可执行命令、删除或覆盖文件。模型会据此调用工具，应在设计层面收敛权限。",
+      "remediation": "按最小权限拆分工具，危险操作改为「申请 + 人工确认」；工具描述不要鼓励模型执行破坏性动作。",
+      "references": ["OWASP LLM Top 10: LLM08 过度代理"],
+      "patterns": [
+        "(?i)(tool|function|skill)[_ ]?(name|description)\\s*[:=]\\s*[\"'][^\"']*(shell|command|exec|delete|overwrite|rm -rf)[^\"']*[\"']"
+      ]
+    },
+    {
+      "id": "AIC-016",
+      "title": "AI 服务监听所有网卡或开启公开分享",
+      "severity": "medium",
+      "category": "暴露面",
+      "description": "Gradio/Streamlit/Flask 等 AI 应用监听 0.0.0.0 或开启 share=True，可能把未鉴权的模型接口暴露到公网。",
+      "remediation": "默认监听 127.0.0.1，通过反向代理统一做认证；关闭 share 模式，暴露前补充鉴权与限流。",
+      "references": ["OWASP LLM Top 10: LLM06 敏感信息泄露", "CWE-306 关键功能缺少认证"],
+      "patterns": [
+        "(?i)app\\.run\\s*\\([^)\\n]*host\\s*=\\s*[\"']0\\.0\\.0\\.0",
+        "(?i)\\.launch\\s*\\([^)\\n]*(share\\s*=\\s*True|server_name\\s*=\\s*[\"']0\\.0\\.0\\.0)",
+        "(?i)(uvicorn|gunicorn)[^\\n]*0\\.0\\.0\\.0"
+      ]
+    },
+    {
+      "id": "AIC-017",
+      "title": "AI 接口 CORS 允许任意来源",
+      "severity": "medium",
+      "category": "暴露面",
+      "description": "Access-Control-Allow-Origin 为 * 且接口携带会话或密钥时，任意站点都能代替已登录用户调用模型接口。",
+      "remediation": "使用明确的来源白名单；涉及凭证的接口不要使用通配符，并开启 SameSite Cookie。",
+      "references": ["CWE-942 过度宽松的 CORS 策略"],
+      "patterns": [
+        "(?i)allow_origins\\s*=\\s*\\[\\s*[\"']\\*",
+        "(?i)Access-Control-Allow-Origin[\"']?\\s*[:=]\\s*[\"']\\*"
+      ]
+    },
+    {
+      "id": "AIC-018",
+      "title": "模型输出未转义直接渲染",
+      "severity": "high",
+      "category": "不安全输出处理",
+      "description": "把模型返回内容直接写入 innerHTML、dangerouslySetInnerHTML 或模板字符串，攻击者可通过提示注入让模型输出恶意脚本，形成 XSS。",
+      "remediation": "把模型输出当纯文本渲染；必须渲染富文本时使用可信的 HTML 清洗库并限制标签白名单。",
+      "references": ["OWASP LLM Top 10: LLM05 不安全输出处理", "CWE-79 XSS"],
+      "patterns": [
+        "dangerouslySetInnerHTML",
+        "(?i)(innerHTML|outerHTML|document\\.write)\\s*=\\s*[^;\\n]*(response|completion|answer|message|llm)",
+        "(?i)render_template_string\\s*\\("
+      ]
+    },
+    {
+      "id": "AIC-019",
+      "title": "模型/推理端点地址由用户控制（SSRF）",
+      "severity": "medium",
+      "category": "服务端请求伪造",
+      "description": "直接把请求参数中的 base_url / endpoint 传给 HTTP 客户端，攻击者可让服务器访问内网模型服务或云元数据端点。",
+      "remediation": "端点地址使用服务端白名单；禁止用户指定协议、主机与端口，拦截私网与元数据地址。",
+      "references": ["OWASP LLM Top 10: LLM05 不安全输出处理", "CWE-918 SSRF"],
+      "patterns": [
+        "(?i)(requests\\.(get|post)|httpx\\.(get|post)|axios\\.(get|post)|fetch)\\s*\\(\\s*(base_url|api_url|endpoint|target_url)\\b"
+      ]
+    },
+    {
+      "id": "AIC-020",
+      "title": "AI 文件工具存在路径穿越",
+      "severity": "high",
+      "category": "路径穿越",
+      "description": "文件读取/写入工具直接把用户参数拼进路径，攻击者可用 ../ 读取 .env、密钥文件或写入任意位置。",
+      "remediation": "使用 filepath.Clean + 前缀校验把路径限制在允许目录内；拒绝绝对路径与 .. 片段。",
+      "references": ["OWASP Agentic Security: 工具滥用", "CWE-22 路径穿越"],
+      "patterns": [
+        "(?i)open\\s*\\(\\s*(os\\.path\\.join\\s*\\([^)]*(user|input|filename|path)|request\\.(args|form|json)\\[)"
+      ]
+    },
+    {
+      "id": "AIC-021",
+      "title": "系统提示词通过接口返回",
+      "severity": "low",
+      "category": "敏感信息泄露",
+      "description": "接口直接返回 system prompt，可能暴露内部业务规则、工具清单与安全约束，便于攻击者构造绕过。",
+      "remediation": "不要在响应中返回系统提示词；如需调试，仅在内网管理端按权限展示。",
+      "references": ["OWASP LLM Top 10: LLM06 敏感信息泄露"],
+      "patterns": [
+        "(?i)(system_prompt|systemPrompt|SYSTEM_PROMPT)\\s*[^\\n]{0,60}(jsonify|res\\.json|return|print)"
+      ]
+    },
+    {
+      "id": "AIC-022",
+      "title": "过短或弱随机的 JWT / 会话密钥",
+      "severity": "high",
+      "category": "认证与会话",
+      "description": "使用长度过短或明显的弱密钥签发 JWT/会话，攻击者可暴力破解并伪造任意用户身份。",
+      "remediation": "使用至少 32 字节的加密随机密钥并从环境变量读取；定期轮换并支持密钥版本。",
+      "references": ["CWE-326 密钥强度不足", "CWE-798 硬编码凭据"],
+      "patterns": [
+        "(?i)(jwt[_-]?secret|secret[_-]?key|session[_-]?secret|SECRET_KEY)\\s*[:=]\\s*[\"'][^\"']{1,31}[\"']"
+      ],
+      "negative": "(?i)(your|example|placeholder|dummy|sample|changeme|change-me|\\$\\{)"
+    },
+    {
+      "id": "AIC-023",
+      "title": "外部上下文直接写入 Agent 记忆",
+      "severity": "medium",
+      "category": "记忆投毒",
+      "description": "把请求内容或外部检索结果追加到 Agent 的 memory/history/scratchpad，攻击者可持久化恶意指令，影响后续所有会话。",
+      "remediation": "记忆写入前做来源与内容校验，区分可信/不可信记忆；对外部内容设置过期时间与容量上限。",
+      "references": ["OWASP Agentic Security: 记忆投毒"],
+      "patterns": [
+        "(?i)(memory|history|scratchpad|context)\\s*(\\+=|append\\()\\s*[^\\n]*(request|user|input|external|retrieved)"
+      ]
+    },
+    {
+      "id": "AIC-024",
+      "title": "MCP / Agent 配置使用 Shell 启动",
+      "severity": "medium",
+      "category": "Agent 配置",
+      "description": "MCP 或 Agent 配置通过 sh/bash -c 启动子进程，配置一旦被篡改即可执行任意命令，且审计困难。",
+      "remediation": "直接指定可执行文件与参数数组，避免 shell -c；固定 MCP Server 版本并校验来源。",
+      "references": ["OWASP Agentic Security: 供应链与工具滥用"],
+      "extensions": [".json", ".jsonc", ".yaml", ".yml", ".toml"],
+      "patterns": [
+        "(?i)\"command\"\\s*:\\s*\"(sh|bash|cmd|powershell)\"",
+        "(?i)\"args\"\\s*:\\s*\\[\\s*\"-c\""
+      ]
+    },
+    {
+      "id": "AIC-025",
+      "title": "调试模式随生产环境启动",
+      "severity": "low",
+      "category": "安全配置",
+      "description": "以 debug=True 启动 AI 服务，异常页面可能泄露源码、环境变量与内部提示词。",
+      "remediation": "生产环境关闭 debug 与热重载，错误信息统一返回通用提示。",
+      "references": ["CWE-489 遗留调试代码"],
+      "patterns": [
+        "(?i)(debug|DEBUG)\\s*=\\s*True"
+      ]
+    },
+    {
+      "id": "AIC-026",
+      "title": "敏感环境变量被发送给模型或前端",
+      "severity": "high",
+      "category": "敏感信息泄露",
+      "description": "把 process.env / os.environ 整体序列化后交给模型服务或返回前端，可能泄露数据库口令、云密钥等非模型配置。",
+      "remediation": "只传递业务必需的显式字段；对发往第三方模型的数据做脱敏与白名单过滤。",
+      "references": ["OWASP LLM Top 10: LLM06 敏感信息泄露"],
+      "patterns": [
+        "(?i)JSON\\.stringify\\s*\\(\\s*process\\.env",
+        "(?i)(messages|prompt)[^\\n]{0,60}os\\.environ"
+      ]
+    }
+  ]
+}
